@@ -9,7 +9,6 @@ tasks.bootJar {
     archiveFileName.set("app.jar")
 }
 
-
 repositories {
     mavenLocal()
     mavenCentral()
