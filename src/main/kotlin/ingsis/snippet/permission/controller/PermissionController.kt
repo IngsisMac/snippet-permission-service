@@ -74,4 +74,20 @@ class PermissionController(
         val requesterId = jwt?.subject ?: "anonymous"
         permissionService.revokeShare(snippetId, requesterId, targetUserId)
     }
+
+    @GetMapping("/user/{userId}")
+    fun listUserPermissions(
+        @PathVariable userId: String,
+        @RequestParam(required = false) level: PermissionLevel?,
+    ): List<PermissionResponse> = permissionService.getUserPermissions(userId, level)
+
+    @PostMapping("/{snippetId}/transfer")
+    fun transferOwnership(
+        @PathVariable snippetId: UUID,
+        @RequestParam newOwnerId: String,
+        @AuthenticationPrincipal jwt: Jwt?,
+    ): PermissionResponse {
+        val currentOwnerId = jwt?.subject ?: "anonymous"
+        return permissionService.transferOwnership(snippetId, currentOwnerId, newOwnerId)
+    }
 }

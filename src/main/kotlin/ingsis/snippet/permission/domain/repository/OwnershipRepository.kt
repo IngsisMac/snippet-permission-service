@@ -16,6 +16,8 @@ interface OwnershipRepository : JpaRepository<Ownership, UUID> {
 
     fun findAllBySnippetId(snippetId: UUID): List<Ownership>
 
+    fun findAllByUserId(userId: String): List<Ownership>
+
     fun findAllByUserIdAndLevel(
         userId: String,
         level: PermissionLevel,

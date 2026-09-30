@@ -94,6 +94,51 @@ class PermissionService(
         ownershipRepository.deleteBySnippetIdAndUserId(snippetId, targetUserId)
     }
 
+    @Transactional(readOnly = true)
+    fun getUserPermissions(
+        userId: String,
+        level: PermissionLevel? = null,
+    ): List<PermissionResponse> {
+        val records =
+            if (level != null) {
+                ownershipRepository.findAllByUserIdAndLevel(userId, level)
+            } else {
+                ownershipRepository.findAllByUserId(userId)
+            }
+        return records.map { mapToResponse(it) }
+    }
+
+    @Transactional
+    fun transferOwnership(
+        snippetId: UUID,
+        currentOwnerId: String,
+        newOwnerId: String,
+    ): PermissionResponse {
+        val currentLevel = getPermission(snippetId, currentOwnerId)
+        if (currentLevel != PermissionLevel.OWNER) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can transfer ownership")
+        }
+        val currentOwner =
+            ownershipRepository
+                .findBySnippetIdAndUserId(snippetId, currentOwnerId)
+                .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Current owner not found") }
+
+        val newOwner =
+            ownershipRepository
+                .findBySnippetIdAndUserId(snippetId, newOwnerId)
+                .orElse(
+                    Ownership(
+                        snippetId = snippetId,
+                        userId = newOwnerId,
+                        level = PermissionLevel.OWNER,
+                    ),
+                )
+        newOwner.level = PermissionLevel.OWNER
+        currentOwner.level = PermissionLevel.WRITE
+        ownershipRepository.save(currentOwner)
+        return mapToResponse(ownershipRepository.save(newOwner))
+    }
+
     private fun mapToResponse(ownership: Ownership): PermissionResponse =
         PermissionResponse(
             snippetId = ownership.snippetId,

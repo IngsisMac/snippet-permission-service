@@ -113,4 +113,54 @@ class PermissionControllerTest {
                     .with(jwt().jwt { it.subject("auth0|owner123") }),
             ).andExpect(status().isNoContent)
     }
+
+    @Test
+    fun shouldListUserPermissionsEndpoint() {
+        val userId = "auth0|user1"
+        val snippetId = UUID.randomUUID()
+        val permissions =
+            listOf(
+                PermissionResponse(
+                    snippetId = snippetId,
+                    userId = userId,
+                    level = PermissionLevel.OWNER,
+                    grantedAt = Instant.now(),
+                ),
+            )
+
+        whenever(permissionService.getUserPermissions(userId, null)).thenReturn(permissions)
+
+        mockMvc
+            .perform(
+                get("/api/permissions/user/{userId}", userId)
+                    .with(jwt()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].snippetId").value(snippetId.toString()))
+            .andExpect(jsonPath("$[0].level").value("OWNER"))
+    }
+
+    @Test
+    fun shouldTransferOwnershipEndpoint() {
+        val snippetId = UUID.randomUUID()
+        val currentOwner = "auth0|currentOwner"
+        val newOwner = "auth0|newOwner"
+        val response =
+            PermissionResponse(
+                snippetId = snippetId,
+                userId = newOwner,
+                level = PermissionLevel.OWNER,
+                grantedAt = Instant.now(),
+            )
+
+        whenever(permissionService.transferOwnership(snippetId, currentOwner, newOwner)).thenReturn(response)
+
+        mockMvc
+            .perform(
+                post("/api/permissions/{snippetId}/transfer", snippetId)
+                    .param("newOwnerId", newOwner)
+                    .with(jwt().jwt { it.subject(currentOwner) }),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.level").value("OWNER"))
+            .andExpect(jsonPath("$.userId").value(newOwner))
+    }
 }
