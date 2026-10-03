@@ -120,4 +120,13 @@ class RulesControllerTest {
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.rulesVersion").value(2))
     }
+
+    @Test
+    fun shouldNotExposeOtherUsersRulesOnPublicApi() {
+        mockMvc
+            .perform(
+                get("/api/permissions/rules/lint/{userId}", "auth0|victim")
+                    .with(jwt().jwt { it.subject("auth0|curious") }),
+            ).andExpect(status().isNotFound)
+    }
 }

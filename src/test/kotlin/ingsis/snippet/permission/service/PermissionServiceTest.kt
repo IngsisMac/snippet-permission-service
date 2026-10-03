@@ -11,8 +11,10 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
@@ -189,5 +191,61 @@ class PermissionServiceTest {
         assertThrows<ResponseStatusException> {
             permissionService.transferOwnership(snippetId, nonOwnerId, newOwnerId)
         }
+    }
+
+    @Test
+    fun shouldRejectSharingWithOwnerLevel() {
+        val snippetId = UUID.randomUUID()
+        val ownerId = "auth0|owner123"
+        val request = ShareSnippetRequest(targetUserId = "auth0|collaborator", level = PermissionLevel.OWNER)
+        val ownerOwnership = Ownership(snippetId = snippetId, userId = ownerId, level = PermissionLevel.OWNER)
+        whenever(
+            ownershipRepository.findBySnippetIdAndUserId(snippetId, ownerId)
+        ).thenReturn(Optional.of(ownerOwnership))
+
+        val exception =
+            assertThrows<ResponseStatusException> {
+                permissionService.shareSnippet(snippetId, ownerId, request)
+            }
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
+        verify(ownershipRepository, never()).save(any<Ownership>())
+    }
+
+    @Test
+    fun shouldRejectSharingWithOneself() {
+        val snippetId = UUID.randomUUID()
+        val ownerId = "auth0|owner123"
+        val request = ShareSnippetRequest(targetUserId = ownerId)
+        val ownerOwnership = Ownership(snippetId = snippetId, userId = ownerId, level = PermissionLevel.OWNER)
+        whenever(
+            ownershipRepository.findBySnippetIdAndUserId(snippetId, ownerId)
+        ).thenReturn(Optional.of(ownerOwnership))
+
+        val exception =
+            assertThrows<ResponseStatusException> {
+                permissionService.shareSnippet(snippetId, ownerId, request)
+            }
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
+    }
+
+    @Test
+    fun shouldShareWithReadLevelByDefault() {
+        val snippetId = UUID.randomUUID()
+        val ownerId = "auth0|owner123"
+        val targetUser = "auth0|reader"
+        val request = ShareSnippetRequest(targetUserId = targetUser)
+        val ownerOwnership = Ownership(snippetId = snippetId, userId = ownerId, level = PermissionLevel.OWNER)
+        whenever(
+            ownershipRepository.findBySnippetIdAndUserId(snippetId, ownerId)
+        ).thenReturn(Optional.of(ownerOwnership))
+        whenever(ownershipRepository.findBySnippetIdAndUserId(snippetId, targetUser)).thenReturn(Optional.empty())
+        whenever(ownershipRepository.save(any<Ownership>())).thenAnswer { it.arguments[0] }
+
+        val response = permissionService.shareSnippet(snippetId, ownerId, request)
+
+        assertEquals(PermissionLevel.READ, response.level)
+        assertEquals(targetUser, response.userId)
     }
 }

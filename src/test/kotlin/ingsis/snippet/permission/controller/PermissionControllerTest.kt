@@ -38,34 +38,9 @@ class PermissionControllerTest {
     private lateinit var permissionService: PermissionService
 
     @Test
-    fun shouldAssignOwnerEndpoint() {
+    fun shouldResolveMyPermissionFromJwtSubject() {
         val snippetId = UUID.randomUUID()
-        val userId = "auth0|owner123"
-        val response =
-            PermissionResponse(
-                snippetId = snippetId,
-                userId = userId,
-                level = PermissionLevel.OWNER,
-                grantedAt = Instant.now(),
-            )
-
-        whenever(permissionService.assignOwner(snippetId, userId)).thenReturn(response)
-
-        mockMvc
-            .perform(
-                post("/api/permissions")
-                    .param("snippetId", snippetId.toString())
-                    .param("userId", userId)
-                    .with(jwt()),
-            ).andExpect(status().isCreated)
-            .andExpect(jsonPath("$.level").value("OWNER"))
-            .andExpect(jsonPath("$.userId").value(userId))
-    }
-
-    @Test
-    fun shouldGetPermissionEndpoint() {
-        val snippetId = UUID.randomUUID()
-        whenever(permissionService.getPermission(eq(snippetId), any())).thenReturn(PermissionLevel.OWNER)
+        whenever(permissionService.getPermission(snippetId, "auth0|owner123")).thenReturn(PermissionLevel.OWNER)
 
         mockMvc
             .perform(
@@ -73,6 +48,20 @@ class PermissionControllerTest {
                     .with(jwt().jwt { it.subject("auth0|owner123") }),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.level").value("OWNER"))
+    }
+
+    @Test
+    fun shouldIgnoreUserQueryParamAndUseJwtSubject() {
+        val snippetId = UUID.randomUUID()
+        whenever(permissionService.getPermission(snippetId, "auth0|owner123")).thenReturn(PermissionLevel.READ)
+
+        mockMvc
+            .perform(
+                get("/api/permissions/{snippetId}", snippetId)
+                    .param("user", "auth0|victim")
+                    .with(jwt().jwt { it.subject("auth0|owner123") }),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.level").value("READ"))
     }
 
     @Test
@@ -115,7 +104,7 @@ class PermissionControllerTest {
     }
 
     @Test
-    fun shouldListUserPermissionsEndpoint() {
+    fun shouldListMyPermissionsFromJwtSubject() {
         val userId = "auth0|user1"
         val snippetId = UUID.randomUUID()
         val permissions =
@@ -132,11 +121,22 @@ class PermissionControllerTest {
 
         mockMvc
             .perform(
-                get("/api/permissions/user/{userId}", userId)
-                    .with(jwt()),
+                get("/api/permissions/me")
+                    .with(jwt().jwt { it.subject(userId) }),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$[0].snippetId").value(snippetId.toString()))
             .andExpect(jsonPath("$[0].level").value("OWNER"))
+    }
+
+    @Test
+    fun shouldNotExposeOwnerAssignmentOnPublicApi() {
+        mockMvc
+            .perform(
+                post("/api/permissions")
+                    .param("snippetId", UUID.randomUUID().toString())
+                    .param("userId", "auth0|attacker")
+                    .with(jwt().jwt { it.subject("auth0|attacker") }),
+            ).andExpect(status().isNotFound)
     }
 
     @Test

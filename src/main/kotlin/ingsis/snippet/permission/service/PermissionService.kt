@@ -44,6 +44,7 @@ class PermissionService(
         if (requesterLevel != PermissionLevel.OWNER) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can share snippets")
         }
+        assertShareRequestIsValid(requesterId, request)
 
         val target =
             ownershipRepository
@@ -139,6 +140,21 @@ class PermissionService(
         return mapToResponse(ownershipRepository.save(newOwner))
     }
 
+    private fun assertShareRequestIsValid(
+        requesterId: String,
+        request: ShareSnippetRequest,
+    ) {
+        if (request.level !in SHAREABLE_LEVELS) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Snippets can only be shared with READ or WRITE level; use transfer to change the owner",
+            )
+        }
+        if (request.targetUserId == requesterId) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Owners cannot share a snippet with themselves")
+        }
+    }
+
     private fun mapToResponse(ownership: Ownership): PermissionResponse =
         PermissionResponse(
             snippetId = ownership.snippetId,
@@ -146,4 +162,8 @@ class PermissionService(
             level = ownership.level,
             grantedAt = ownership.grantedAt,
         )
+
+    companion object {
+        private val SHAREABLE_LEVELS = setOf(PermissionLevel.READ, PermissionLevel.WRITE)
+    }
 }
