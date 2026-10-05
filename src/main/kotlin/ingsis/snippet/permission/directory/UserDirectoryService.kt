@@ -26,15 +26,12 @@ class UserDirectoryService(
         userId: String,
         request: RegisterProfileRequest,
     ): UserSummaryResponse {
-        val now = Instant.now()
+        repository.upsert(userId, request.name, request.email, Instant.now())
         val profile =
-            repository.findById(userId).orElseGet {
-                UserProfile(userId = userId, name = request.name, email = request.email, firstSeenAt = now)
+            repository.findById(userId).orElseThrow {
+                IllegalStateException("User $userId was not persisted after upsert")
             }
-        profile.name = request.name
-        profile.email = request.email
-        profile.lastSeenAt = now
-        return toSummary(repository.save(profile))
+        return toSummary(profile)
     }
 
     @Transactional(readOnly = true)

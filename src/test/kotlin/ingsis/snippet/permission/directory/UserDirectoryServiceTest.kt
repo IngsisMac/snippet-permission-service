@@ -5,7 +5,7 @@ import ingsis.snippet.permission.domain.model.UserProfile
 import ingsis.snippet.permission.domain.repository.UserProfileRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -17,7 +17,6 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
-import java.time.Instant
 import java.util.Optional
 
 class UserDirectoryServiceTest {
@@ -29,40 +28,42 @@ class UserDirectoryServiceTest {
     @BeforeEach
     fun setUp() {
         repository = mock()
-        whenever(repository.save(any<UserProfile>())).thenAnswer { it.arguments[0] }
         service = UserDirectoryService(repository)
     }
 
     @Test
-    fun shouldCreateProfileOnFirstLogin() {
-        whenever(repository.findById(requesterId)).thenReturn(Optional.empty())
+    fun shouldUpsertProfileAndReturnPersistedSummary() {
+        val request = RegisterProfileRequest(name = "Ana", email = "ana@mail.com")
+        val persisted = UserProfile(userId = requesterId, name = "Ana", email = "ana@mail.com")
+        whenever(repository.findById(requesterId)).thenReturn(Optional.of(persisted))
 
-        val summary = service.registerSelf(requesterId, RegisterProfileRequest(name = "Ana", email = "ana@mail.com"))
+        val summary = service.registerSelf(requesterId, request)
 
+        verify(repository).upsert(eq(requesterId), eq("Ana"), eq("ana@mail.com"), any())
         assertEquals(requesterId, summary.id)
         assertEquals("Ana", summary.name)
         assertEquals("ana@mail.com", summary.email)
     }
 
     @Test
-    fun shouldRefreshNameAndLastSeenOnLaterLogins() {
-        val firstSeen = Instant.parse("2026-09-01T00:00:00Z")
-        val existing =
-            UserProfile(
-                userId = requesterId,
-                name = "Old",
-                email = null,
-                firstSeenAt = firstSeen,
-                lastSeenAt = firstSeen
-            )
-        whenever(repository.findById(requesterId)).thenReturn(Optional.of(existing))
+    fun shouldUpsertWithoutEmailWhenTokenHasNone() {
+        val persisted = UserProfile(userId = requesterId, name = "Renamed", email = null)
+        whenever(repository.findById(requesterId)).thenReturn(Optional.of(persisted))
 
         val summary = service.registerSelf(requesterId, RegisterProfileRequest(name = "Renamed"))
 
+        verify(repository).upsert(eq(requesterId), eq("Renamed"), isNull(), any())
         assertEquals("Renamed", summary.name)
         assertNull(summary.email)
-        assertEquals(firstSeen, existing.firstSeenAt)
-        assertTrue(existing.lastSeenAt.isAfter(firstSeen))
+    }
+
+    @Test
+    fun shouldFailLoudlyIfProfileIsMissingAfterUpsert() {
+        whenever(repository.findById(requesterId)).thenReturn(Optional.empty())
+
+        assertThrows(IllegalStateException::class.java) {
+            service.registerSelf(requesterId, RegisterProfileRequest(name = "Ana"))
+        }
     }
 
     @Test
