@@ -1,7 +1,10 @@
 package ingsis.snippet.permission.controller
 
+import ingsis.snippet.permission.controller.dto.RuleDefinitionResponse
 import ingsis.snippet.permission.controller.dto.RulesResponse
 import ingsis.snippet.permission.controller.dto.UpdateRulesRequest
+import ingsis.snippet.permission.domain.model.RuleType
+import ingsis.snippet.permission.service.RuleCatalogService
 import ingsis.snippet.permission.service.RulesService
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
@@ -15,7 +18,21 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/permissions/rules")
 class RulesController(
     private val rulesService: RulesService,
+    private val ruleCatalogService: RuleCatalogService,
 ) {
+    /**
+     * Reglas que la plataforma acepta, con su tipo y sus valores válidos. La interfaz lo consume
+     * para armar la pantalla de reglas; el `PUT` se valida contra este mismo catálogo.
+     */
+    @GetMapping("/catalog/lint")
+    fun getLintRuleCatalog(): List<RuleDefinitionResponse> = catalogOf(RuleType.LINT)
+
+    @GetMapping("/catalog/format")
+    fun getFormatRuleCatalog(): List<RuleDefinitionResponse> = catalogOf(RuleType.FORMAT)
+
+    private fun catalogOf(type: RuleType): List<RuleDefinitionResponse> =
+        ruleCatalogService.definitions(type).map { RuleDefinitionResponse.from(it) }
+
     @GetMapping("/lint")
     fun getMyLintRules(
         @AuthenticationPrincipal jwt: Jwt,

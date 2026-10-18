@@ -4,6 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import ingsis.snippet.permission.config.SecurityConfig
 import ingsis.snippet.permission.controller.dto.RulesResponse
 import ingsis.snippet.permission.controller.dto.UpdateRulesRequest
+import ingsis.snippet.permission.domain.model.RuleCatalogProperties
+import ingsis.snippet.permission.domain.model.RuleDefinition
+import ingsis.snippet.permission.domain.model.RuleKind
+import ingsis.snippet.permission.domain.model.RuleType
+import ingsis.snippet.permission.service.RuleCatalogService
 import ingsis.snippet.permission.service.RulesService
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -33,6 +38,44 @@ class RulesControllerTest {
 
     @MockBean
     private lateinit var rulesService: RulesService
+
+    @MockBean
+    private lateinit var ruleCatalogService: RuleCatalogService
+
+    @Test
+    fun shouldPublishTheLintRuleCatalogWithTypesAndAcceptedValues() {
+        whenever(ruleCatalogService.definitions(RuleType.LINT))
+            .thenReturn(RuleCatalogProperties.DEFAULT_LINT_RULES)
+
+        mockMvc
+            .perform(get("/api/permissions/rules/catalog/lint").with(jwt()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].name").value("identifier_format"))
+            .andExpect(jsonPath("$[0].kind").value("string"))
+            .andExpect(jsonPath("$[0].defaultValue").value("camel case"))
+            .andExpect(jsonPath("$[0].allowedValues.length()").value(2))
+    }
+
+    @Test
+    fun shouldPublishTheFormatRuleCatalogWithItsNumericDefaults() {
+        whenever(ruleCatalogService.definitions(RuleType.FORMAT))
+            .thenReturn(listOf(RuleDefinition("indent-inside-if", RuleKind.NUMBER, 4)))
+
+        mockMvc
+            .perform(get("/api/permissions/rules/catalog/format").with(jwt()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].name").value("indent-inside-if"))
+            .andExpect(jsonPath("$[0].kind").value("number"))
+            .andExpect(jsonPath("$[0].defaultValue").value(4))
+            .andExpect(jsonPath("$[0].allowedValues.length()").value(0))
+    }
+
+    @Test
+    fun shouldRejectAnUnauthenticatedCatalogRequest() {
+        mockMvc
+            .perform(get("/api/permissions/rules/catalog/lint"))
+            .andExpect(status().isUnauthorized)
+    }
 
     @Test
     fun shouldGetMyLintRules() {
