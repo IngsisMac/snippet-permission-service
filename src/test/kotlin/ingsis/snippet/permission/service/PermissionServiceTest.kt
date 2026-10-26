@@ -119,6 +119,15 @@ class PermissionServiceTest {
     }
 
     @Test
+    fun shouldRevokeAllOwnershipRecordsForSnippet() {
+        val snippetId = UUID.randomUUID()
+
+        permissionService.revokeAllForSnippet(snippetId)
+
+        verify(ownershipRepository).deleteBySnippetId(snippetId)
+    }
+
+    @Test
     fun shouldReturnAllUserPermissionsWhenNoFilterProvided() {
         val userId = "auth0|user1"
         val snippetId1 = UUID.randomUUID()

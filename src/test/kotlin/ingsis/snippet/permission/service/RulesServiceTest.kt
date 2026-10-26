@@ -46,7 +46,7 @@ class RulesServiceTest {
 
         assertNotNull(response)
         assertEquals(userId, response.userId)
-        assertEquals(1, response.rulesVersion)
+        assertEquals(0, response.rulesVersion)
     }
 
     @Test
@@ -74,7 +74,7 @@ class RulesServiceTest {
 
         assertNotNull(response)
         assertEquals(userId, response.userId)
-        assertEquals(1, response.rulesVersion)
+        assertEquals(0, response.rulesVersion)
     }
 
     @Test

@@ -13,7 +13,7 @@ class FormatConfig(
     @Column(name = "user_id")
     val userId: String,
     @Column(name = "rules_version", nullable = false)
-    var rulesVersion: Int = 1,
+    var rulesVersion: Int = 0,
     @Column(nullable = false, columnDefinition = "TEXT")
     var rules: String = "{}",
     @Column(name = "updated_at", nullable = false)

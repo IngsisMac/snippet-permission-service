@@ -27,4 +27,6 @@ interface OwnershipRepository : JpaRepository<Ownership, UUID> {
         snippetId: UUID,
         userId: String,
     )
+
+    fun deleteBySnippetId(snippetId: UUID)
 }
