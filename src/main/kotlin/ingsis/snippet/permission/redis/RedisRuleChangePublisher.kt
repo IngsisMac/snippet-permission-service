@@ -20,11 +20,17 @@ class RedisRuleChangePublisher(
         rules: Map<String, Any>,
     ) {
         val rulesJson = objectMapper.writeValueAsString(rules)
+        val correlationId =
+            org.slf4j.MDC.get(ingsis.snippet.permission.tracing.CorrelationIdFilter.CORRELATION_ID_KEY)
+                ?: java.util.UUID
+                    .randomUUID()
+                    .toString()
         val event =
             LintRulesChangeEvent(
                 userId = userId,
                 rulesVersion = rulesVersion,
                 rules = rulesJson,
+                correlationId = correlationId,
             )
         lintRuleChangeProducer.emit(event)
         logger.info(
@@ -41,11 +47,17 @@ class RedisRuleChangePublisher(
         rules: Map<String, Any>,
     ) {
         val rulesJson = objectMapper.writeValueAsString(rules)
+        val correlationId =
+            org.slf4j.MDC.get(ingsis.snippet.permission.tracing.CorrelationIdFilter.CORRELATION_ID_KEY)
+                ?: java.util.UUID
+                    .randomUUID()
+                    .toString()
         val event =
             FormatRulesChangeEvent(
                 userId = userId,
                 rulesVersion = rulesVersion,
                 rules = rulesJson,
+                correlationId = correlationId,
             )
         formatRuleChangeProducer.emit(event)
         logger.info(
