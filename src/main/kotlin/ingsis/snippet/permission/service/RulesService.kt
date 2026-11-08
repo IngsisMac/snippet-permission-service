@@ -6,6 +6,7 @@ import ingsis.snippet.permission.controller.dto.RulesResponse
 import ingsis.snippet.permission.controller.dto.UpdateRulesRequest
 import ingsis.snippet.permission.domain.model.FormatConfig
 import ingsis.snippet.permission.domain.model.LintConfig
+import ingsis.snippet.permission.domain.model.RuleType
 import ingsis.snippet.permission.domain.repository.FormatConfigRepository
 import ingsis.snippet.permission.domain.repository.LintConfigRepository
 import ingsis.snippet.permission.redis.RuleChangePublisher
@@ -18,6 +19,7 @@ class RulesService(
     private val lintConfigRepository: LintConfigRepository,
     private val formatConfigRepository: FormatConfigRepository,
     private val objectMapper: ObjectMapper,
+    private val ruleCatalogService: RuleCatalogService,
     private val ruleChangePublisher: RuleChangePublisher? = null,
 ) {
     @Transactional(readOnly = true)
@@ -39,12 +41,13 @@ class RulesService(
         userId: String,
         request: UpdateRulesRequest,
     ): RulesResponse {
+        val rules = ruleCatalogService.validate(RuleType.LINT, request.rules)
         val config =
             lintConfigRepository.findById(userId).orElseGet {
                 LintConfig(userId = userId, rulesVersion = 0)
             }
         config.rulesVersion += 1
-        config.rules = objectMapper.writeValueAsString(request.rules)
+        config.rules = objectMapper.writeValueAsString(rules)
         config.updatedAt = Instant.now()
         val saved = lintConfigRepository.save(config)
         val parsedRules = parseRules(saved.rules)
@@ -78,12 +81,13 @@ class RulesService(
         userId: String,
         request: UpdateRulesRequest,
     ): RulesResponse {
+        val rules = ruleCatalogService.validate(RuleType.FORMAT, request.rules)
         val config =
             formatConfigRepository.findById(userId).orElseGet {
                 FormatConfig(userId = userId, rulesVersion = 0)
             }
         config.rulesVersion += 1
-        config.rules = objectMapper.writeValueAsString(request.rules)
+        config.rules = objectMapper.writeValueAsString(rules)
         config.updatedAt = Instant.now()
         val saved = formatConfigRepository.save(config)
         val parsedRules = parseRules(saved.rules)

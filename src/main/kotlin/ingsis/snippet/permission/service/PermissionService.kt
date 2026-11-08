@@ -95,6 +95,11 @@ class PermissionService(
         ownershipRepository.deleteBySnippetIdAndUserId(snippetId, targetUserId)
     }
 
+    @Transactional
+    fun revokeAllForSnippet(snippetId: UUID) {
+        ownershipRepository.deleteBySnippetId(snippetId)
+    }
+
     @Transactional(readOnly = true)
     fun getUserPermissions(
         userId: String,
