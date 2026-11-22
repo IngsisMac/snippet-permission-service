@@ -90,4 +90,19 @@ class UserDirectoryServiceTest {
         verify(repository).search(eq(requesterId), captor.capture(), eq(pageable))
         assertNull(captor.firstValue)
     }
+
+    @Test
+    fun shouldMapKnownUserIdsToTheirNames() {
+        whenever(repository.findAllById(setOf("auth0|ana", "auth0|bot")))
+            .thenReturn(listOf(UserProfile(userId = "auth0|ana", name = "Ana", email = null)))
+
+        val names = service.namesOf(listOf("auth0|ana", "auth0|bot", "auth0|ana"))
+
+        assertEquals(mapOf("auth0|ana" to "Ana"), names)
+    }
+
+    @Test
+    fun shouldReturnNoNamesWithoutQueryingWhenThereAreNoIds() {
+        assertEquals(emptyMap<String, String>(), service.namesOf(emptyList()))
+    }
 }
