@@ -44,6 +44,15 @@ class UserDirectoryService(
         return repository.search(requesterId, normalized, pageable).map { toSummary(it) }
     }
 
+    /** Nombre visible de cada usuario conocido; los que nunca iniciaron sesión no aparecen en el mapa. */
+    @Transactional(readOnly = true)
+    fun namesOf(userIds: Collection<String>): Map<String, String> =
+        if (userIds.isEmpty()) {
+            emptyMap()
+        } else {
+            repository.findAllById(userIds.toSet()).associate { it.userId to it.name }
+        }
+
     private fun toSummary(profile: UserProfile) =
         UserSummaryResponse(id = profile.userId, name = profile.name, email = profile.email)
 }
