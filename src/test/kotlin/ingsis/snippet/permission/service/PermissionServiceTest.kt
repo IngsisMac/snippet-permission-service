@@ -257,4 +257,79 @@ class PermissionServiceTest {
         assertEquals(PermissionLevel.READ, response.level)
         assertEquals(targetUser, response.userId)
     }
+
+    @Test
+    fun shouldPromoteExistingOwnershipToOwner() {
+        val snippetId = UUID.randomUUID()
+        val userId = "auth0|editor"
+        val existing = Ownership(snippetId = snippetId, userId = userId, level = PermissionLevel.WRITE)
+        whenever(ownershipRepository.findBySnippetIdAndUserId(snippetId, userId)).thenReturn(Optional.of(existing))
+        whenever(ownershipRepository.save(existing)).thenReturn(existing)
+
+        val response = permissionService.assignOwner(snippetId, userId)
+
+        assertEquals(PermissionLevel.OWNER, response.level)
+    }
+
+    @Test
+    fun shouldThrowForbiddenWhenListingSharesWithoutAccess() {
+        val snippetId = UUID.randomUUID()
+        whenever(ownershipRepository.findBySnippetIdAndUserId(snippetId, "auth0|stranger")).thenReturn(Optional.empty())
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                permissionService.listShares(snippetId, "auth0|stranger")
+            }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+    }
+
+    @Test
+    fun shouldThrowForbiddenWhenNonOwnerRevokesShare() {
+        val snippetId = UUID.randomUUID()
+        val reader = Ownership(snippetId = snippetId, userId = "auth0|reader", level = PermissionLevel.READ)
+        whenever(
+            ownershipRepository.findBySnippetIdAndUserId(snippetId, "auth0|reader")
+        ).thenReturn(Optional.of(reader))
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                permissionService.revokeShare(snippetId, "auth0|reader", "auth0|other")
+            }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+    }
+
+    @Test
+    fun shouldFilterUserPermissionsByLevelWhenProvided() {
+        val snippetId = UUID.randomUUID()
+        val readRecord = Ownership(snippetId = snippetId, userId = "auth0|u1", level = PermissionLevel.READ)
+        whenever(ownershipRepository.findAllByUserIdAndLevel("auth0|u1", PermissionLevel.READ))
+            .thenReturn(listOf(readRecord))
+        whenever(ownershipRepository.findAllByUserId("auth0|u1")).thenReturn(listOf(readRecord))
+
+        val filtered = permissionService.getUserPermissions("auth0|u1", PermissionLevel.READ)
+        val all = permissionService.getUserPermissions("auth0|u1")
+
+        assertEquals(1, filtered.size)
+        assertEquals(1, all.size)
+    }
+
+    @Test
+    fun shouldCreateNewOwnerRecordWhenTransferringToUserWithoutPriorPermission() {
+        val snippetId = UUID.randomUUID()
+        val currentOwnerId = "auth0|owner1"
+        val newOwnerId = "auth0|brand-new"
+        val currentOwner = Ownership(snippetId = snippetId, userId = currentOwnerId, level = PermissionLevel.OWNER)
+
+        whenever(ownershipRepository.findBySnippetIdAndUserId(snippetId, currentOwnerId))
+            .thenReturn(Optional.of(currentOwner))
+        whenever(ownershipRepository.findBySnippetIdAndUserId(snippetId, newOwnerId))
+            .thenReturn(Optional.empty())
+        whenever(ownershipRepository.save(any<Ownership>())).thenAnswer { it.arguments[0] }
+
+        val result = permissionService.transferOwnership(snippetId, currentOwnerId, newOwnerId)
+
+        assertEquals(newOwnerId, result.userId)
+        assertEquals(PermissionLevel.OWNER, result.level)
+        assertEquals(PermissionLevel.WRITE, currentOwner.level)
+    }
 }

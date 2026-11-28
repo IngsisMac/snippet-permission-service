@@ -102,6 +102,33 @@ class RuleCatalogServiceTest {
         assertTrue(exception.reason!!.contains("expects a string"))
     }
 
+    @Test
+    fun shouldAcceptStringRuleWithoutAllowedValues() {
+        val customCatalog =
+            RuleCatalogProperties(
+                lint =
+                    listOf(
+                        ingsis.snippet.permission.domain.model.RuleDefinition(
+                            name = "custom-pattern",
+                            kind = ingsis.snippet.permission.domain.model.RuleKind.STRING,
+                            defaultValue = "abc",
+                            allowedValues = emptyList(),
+                        ),
+                    ),
+            )
+        val customService = RuleCatalogService(customCatalog)
+
+        assertEquals(
+            mapOf("custom-pattern" to "xyz"),
+            customService.validate(
+                RuleType.LINT,
+                mapOf(
+                    "custom-pattern" to "xyz"
+                )
+            )
+        )
+    }
+
     private fun rejectionOf(
         type: RuleType,
         rules: Map<String, Any>,

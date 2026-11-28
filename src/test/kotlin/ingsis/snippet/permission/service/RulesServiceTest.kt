@@ -92,4 +92,52 @@ class RulesServiceTest {
         assertEquals(true, response.rules["enforce-spacing-before-colon-in-declaration"])
         verify(formatConfigRepository).save(any<FormatConfig>())
     }
+
+    @Test
+    fun shouldPublishRuleChangesWhenUpdatingFirstTimeAndHandleInvalidJson() {
+        val userId = "auth0|new-user"
+        val publisher = org.mockito.kotlin.mock<ingsis.snippet.permission.redis.RuleChangePublisher>()
+        val serviceWithPublisher =
+            RulesService(
+                lintConfigRepository,
+                formatConfigRepository,
+                com.fasterxml.jackson.databind
+                    .ObjectMapper(),
+                RuleCatalogService(
+                    ingsis.snippet.permission.domain.model
+                        .RuleCatalogProperties()
+                ),
+                publisher,
+            )
+
+        whenever(lintConfigRepository.findById(userId)).thenReturn(Optional.empty())
+        whenever(lintConfigRepository.save(any<LintConfig>())).thenAnswer { it.arguments[0] }
+        whenever(formatConfigRepository.findById(userId)).thenReturn(Optional.empty())
+        whenever(formatConfigRepository.save(any<FormatConfig>())).thenAnswer { it.arguments[0] }
+
+        val lintRes =
+            serviceWithPublisher.updateLintRules(
+                userId,
+                UpdateRulesRequest(
+                    mapOf(
+                        "no-unused-variables" to true
+                    )
+                )
+            )
+        val formatRes =
+            serviceWithPublisher.updateFormatRules(
+                userId,
+                UpdateRulesRequest(mapOf("indent-inside-if" to 2))
+            )
+
+        assertEquals(1, lintRes.rulesVersion)
+        assertEquals(1, formatRes.rulesVersion)
+        verify(publisher).publishLintRuleChange(userId, 1, mapOf("no-unused-variables" to true))
+        verify(publisher).publishFormatRuleChange(userId, 1, mapOf("indent-inside-if" to 2))
+
+        whenever(lintConfigRepository.findById("auth0|corrupt")).thenReturn(
+            Optional.of(LintConfig(userId = "auth0|corrupt", rulesVersion = 1, rules = "{bad-json")),
+        )
+        assertEquals(emptyMap<String, Any>(), serviceWithPublisher.getLintRules("auth0|corrupt").rules)
+    }
 }
